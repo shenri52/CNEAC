@@ -47,30 +47,6 @@ for (c in 1:nrow(liste_dept)) {
                    html_node("body") %>%
                    html_text(trim = TRUE)
       
-      # Pattern pour le territoire: cherche "Territoire : " suivi de n'importe quel contenu jusqu'à "Adresse"
-      #territoire_pattern <- "Territoriale\\s*:\\s*(.*?)(?=\\s*Adresse|$)"
-      
-      # Récupérer l'information concernant le territoire
-      #territoire <- str_match(page_text, territoire_pattern)[, 2] %>% 
-      #              str_trim() %>%
-      #              str_replace_all(pattern = "\\s{2,}", replacement = " ")
-      
-      # Pattern pour la latitude: cherche "Latitude : " suivi de n'importe quel contenu jusqu'à "-"
-      #latitude_pattern <- "Latitude\\s*:\\s*(.*?)(?=\\s*- Longitude|$)"
-      
-      # Récupérer l'information concernant la latitude
-      #gps_latitude <- str_match(page_text, latitude_pattern)[, 2] %>% 
-      #                str_trim() %>%
-      #                str_replace_all(pattern = "\\s{2,}", replacement = " ")
-
-      # Pattern pour la longitude: cherche "Longitude : " suivi de n'importe quel contenu jusqu'à "Google"
-      #longitude_pattern <- "Longitude\\s*:\\s*(.*?)(?=\\s*Google|$)"
-      
-      # Récupérer l'information concernant la longitude
-      #gps_longitude <- str_match(page_text, longitude_pattern)[, 2] %>% 
-      #                 str_trim() %>%
-      #                 str_replace_all(pattern = "\\s{2,}", replacement = " ")
-      
       # Pattern pour les activités: cherche "Activités pratiquées" suivi de n'importe quel contenu jusqu'à "Coordonnées"
       activite_pattern <- "Activités pratiquées\\s*(.*?)(?=\\s*Coordonnées du président|$)"
       
@@ -131,7 +107,7 @@ for(a in 1:ncol(liste_activite)) {
   
   nom_activite <- names(liste_activite[,a])
   
-  df_final[, nom_activite] <- ifelse(str_detect(df_final$Activite, nom_activite), nom_activite, NA)
+  df_final[, nom_activite] <- ifelse(str_detect(df_final$Activite, nom_activite), "oui", "non")
 }
 
 # Suppression des colonnes inutiles
