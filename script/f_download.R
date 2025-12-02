@@ -27,37 +27,35 @@ calendrier <- function(activite, discipline) {
           # Préparation du dataframe
           liste_concours <- liste_concours %>%
                             select(X3) %>%
-                            mutate(Mois = first(X3)) %>%
+                            mutate(Mois_Concours = first(X3)) %>%
                             slice(-1)
         
           # Création de la liste des concours                  
           liste_concours <- liste_concours %>%
-                           mutate(# Remplacer toutes les séquences de plus de 2 esapces - plus de 2 espaces par |
-                                  X3_nettoyee = str_replace_all(X3,pattern = "\\s{2,}-\\s{2,}", replacement = "|") %>%
-                                  # Remplacer  toutes les séquences de 1 esapces - plus de 2 espaces par |
-                                  str_replace_all(pattern = "\\s{1,}-\\s{2,}", replacement = "|") %>%
-                                  # Remplacer toutes les séquences de plus de 2 esapces par |
-                                  str_replace_all(pattern = "\\s{2,}", replacement = "|")
-                                 ) %>%
-                           # Mettre en forme les données en colonne
-                           separate(col = X3_nettoyee,
-                                    into = c("Jour_Date", "Type_Evenement", "Territoire", "Lieu", "Club"),
-                                    sep = "\\|",
-                                    extra = "drop" # Important si la ligne contient plus de 5 séparateurs
-                                   ) %>%
-                           # 3. Nettoyage final des valeurs des nouvelles colonnes
-                           
-                           
-                           mutate(# Supprimer les espaces inutiles en début et fin de chaque nouvelle colonne
-                                  across(c(Jour_Date:Club), str_trim),
-                                  # Remplacer les 01, 02, 03 ... par 1, 2, 3...
-                                  Jour_Date = paste0(Jour_Date, " ", str_to_lower(Mois)) %>%
-                                              str_replace_all(pattern = " 0([1-9])", replacement = " \\1"),
-                                  Adresse = NA,
-                                  Lat = NA,
-                                  Lon = NA
-                                 ) %>%
-                           select(-X3)
+                            mutate(# Remplacer toutes les séquences de plus de 2 esapces - plus de 2 espaces par |
+                                   X3_nettoyee = str_replace_all(X3,pattern = "\\s{2,}-\\s{2,}", replacement = "|") %>%
+                                   # Remplacer  toutes les séquences de 1 esapces - plus de 2 espaces par |
+                                   str_replace_all(pattern = "\\s{1,}-\\s{2,}", replacement = "|") %>%
+                                   # Remplacer toutes les séquences de plus de 2 esapces par |
+                                   str_replace_all(pattern = "\\s{2,}", replacement = "|")
+                                  ) %>%
+                            # Mettre en forme les données en colonne
+                            separate(col = X3_nettoyee,
+                                     into = c("Jour_Date", "Type_Evenement", "Territoire", "Lieu", "Club"),
+                                     sep = "\\|",
+                                     extra = "drop" # Important si la ligne contient plus de 5 séparateurs
+                                    ) %>%
+                            # Nettoyage final des valeurs des nouvelles colonnes
+                            mutate(# Supprimer les espaces inutiles en début et fin de chaque nouvelle colonne
+                                   across(c(Jour_Date:Club), str_trim),
+                                   # Remplacer les 01, 02, 03 ... par 1, 2, 3...
+                                   Jour_Date = paste0(Jour_Date, " ", str_to_lower(Mois_Concours)) %>%
+                                               str_replace_all(pattern = " 0([1-9])", replacement = " \\1"),
+                                   Adresse = NA,
+                                   Lat = NA,
+                                   Lon = NA
+                                  ) %>%
+                            select(-X3)
           
           # Récupération des liens vers les fiches concours
           concours <- page_mois %>%
@@ -109,7 +107,7 @@ calendrier <- function(activite, discipline) {
             
             Sys.sleep(2)
             
-            print(paste0("     Concours : ", f," - ", nrow(liste_concours)))
+            print(paste0("     Epreuve : ", f," - ", nrow(liste_concours)))
             
           }
           
@@ -120,24 +118,23 @@ calendrier <- function(activite, discipline) {
               df_final <- liste_concours
            }
         }
-        
-        print(paste0("Fin du téléchargement du mois de ", liste_concours[1,1]))
     }
   
   # Créer une colonne mois propre
   df_final <- df_final %>%
-              mutate(Mois = case_when(str_detect(Mois, "Janvier") ~ paste0("01 - ", Mois),
-                                      str_detect(Mois, "Février") ~ paste0("02 - ", Mois),
-                                      str_detect(Mois, "Mars") ~ paste0("03 - ", Mois),
-                                      str_detect(Mois, "Avril") ~ paste0("04 - ", Mois),
-                                      str_detect(Mois, "Mai") ~ paste0("05 - ", Mois),
-                                      str_detect(Mois, "Juin") ~ paste0("06 - ", Mois),
-                                      str_detect(Mois, "Juillet") ~ paste0("07 - ", Mois),
-                                      str_detect(Mois, "Août") ~ paste0("08 - ", Mois),
-                                      str_detect(Mois, "Septembre") ~ paste0("09 - ", Mois),
-                                      str_detect(Mois, "Octobre") ~ paste0("10 - ", Mois),
-                                      str_detect(Mois, "Novembre") ~ paste0("11 - ", Mois),
-                                      str_detect(Mois, "Décembre") ~ paste0("12 - ", Mois)
+              mutate(Epreuve = activite,
+                     Mois_Concours = case_when(str_detect(Mois_Concours, "Janvier") ~ paste0("01 - ", Mois_Concours),
+                                               str_detect(Mois_Concours, "Février") ~ paste0("02 - ", Mois_Concours),
+                                               str_detect(Mois_Concours, "Mars") ~ paste0("03 - ", Mois_Concours),
+                                               str_detect(Mois_Concours, "Avril") ~ paste0("04 - ", Mois_Concours),
+                                               str_detect(Mois_Concours, "Mai") ~ paste0("05 - ", Mois_Concours),
+                                               str_detect(Mois_Concours, "Juin") ~ paste0("06 - ", Mois_Concours),
+                                               str_detect(Mois_Concours, "Juillet") ~ paste0("07 - ", Mois_Concours),
+                                               str_detect(Mois_Concours, "Août") ~ paste0("08 - ", Mois_Concours),
+                                               str_detect(Mois_Concours, "Septembre") ~ paste0("09 - ", Mois_Concours),
+                                               str_detect(Mois_Concours, "Octobre") ~ paste0("10 - ", Mois_Concours),
+                                               str_detect(Mois_Concours, "Novembre") ~ paste0("11 - ", Mois_Concours),
+                                               str_detect(Mois_Concours, "Décembre") ~ paste0("12 - ", Mois_Concours)
                                     )
                   )
   
@@ -179,7 +176,7 @@ club <- function(){
       lister_club <- lister_club %>%
                      bind_cols(lien_club)
       
-      print(paste0("Début du téléchargement du département ", liste_dept[c, "DEP"]))
+      print(paste0("Téléchargement du département ", liste_dept[c, "DEP"]))
       
       # Fusionner les données départementales
       if(exists("df_final")) {
@@ -190,7 +187,6 @@ club <- function(){
       
     }
     
-    print(paste0("Fin du téléchargement du département ", liste_dept[c, "DEP"]))
     Sys.sleep(2)
   }
   

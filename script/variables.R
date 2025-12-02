@@ -15,8 +15,7 @@ if(month(Sys.Date()) == 12 & day(Sys.Date()) >= 1){
 
 mois_fin <- 12
 
-# Charger la liste des clubs (déjà géocodé)
-# Les clubs ne sont pas réactualiser à chaque chargement du calendrier
+# Charger la liste des clubs
 liste_club <- read.csv2("data/Club.csv", sep = ",")
 
 # Préparation du code département pour les DOM
@@ -28,3 +27,4 @@ liste_dept <- read.csv2("data/departement_2025.csv", sep = ",") %>%
               filter(!(str_detect(DEP, "97"))) %>%
               rbind(dept_DOM)
       
+remove(dept_DOM)

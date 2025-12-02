@@ -11,13 +11,18 @@ export_club <- function(df_export) {
   
 }
 
-export_concours <- function(df_export, activite) {
+export_concours <- function() {
+
+  # Consolidation des données  
+  df_export <- bind_rows(geocodage_concours, geocodage_pass) %>%
+               bind_rows(geocodage_caesc) %>%
+               mutate(id_epreuve = row_number())
   
-    write.table(df_export,
-                paste0("result/", activite, ".csv"),
-                sep = ",",
-                fileEncoding = "UTF-8",
-                row.names = FALSE,
-                na = "")
   
+  write.table(df_export,
+              paste0("result/Epreuve.csv"),
+              sep = ",",
+              fileEncoding = "UTF-8",
+              row.names = FALSE,
+              na = "")
 }
