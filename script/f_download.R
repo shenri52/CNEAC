@@ -1,0 +1,205 @@
+# Fonction : récupération du calendrier des épreuves
+
+calendrier <- function(activite, discipline) {
+
+    # Parcours des mois
+    for (m in mois_debut:mois_fin) {
+      
+        # Construction de l'url d'accès aux données mensuelles
+        url_mois <- paste0(base_url, "calendrier.php?annee=", annee, "&mois=", m, "&Activite=", activite)
+        
+        # Vérification de l'a définition de l'indication d'une discipline
+        if(discipline != "Aucune") {
+          url_mois <- paste0(url_mois, "&Discipline_Pass=", discipline)
+        }
+        
+        # Lecture de la page
+        page_mois <- read_html(url_mois)
+        
+        # Récupération de la liste des concours
+        liste_concours <- page_mois %>%
+                          html_table(fill = TRUE) %>%
+                          as.data.frame()
+        
+        # Vérification de la publication de concours
+        if(nrow(liste_concours) >= 1) {
+          
+          # Préparation du dataframe
+          liste_concours <- liste_concours %>%
+                            select(X3) %>%
+                            mutate(Mois_Concours = first(X3)) %>%
+                            slice(-1)
+        
+          # Création de la liste des concours                  
+          liste_concours <- liste_concours %>%
+                            mutate(# Remplacer toutes les séquences de plus de 2 esapces - plus de 2 espaces par |
+                                   X3_nettoyee = str_replace_all(X3,pattern = "\\s{2,}-\\s{2,}", replacement = "|") %>%
+                                   # Remplacer  toutes les séquences de 1 esapces - plus de 2 espaces par |
+                                   str_replace_all(pattern = "\\s{1,}-\\s{2,}", replacement = "|") %>%
+                                   # Remplacer toutes les séquences de plus de 2 esapces par |
+                                   str_replace_all(pattern = "\\s{2,}", replacement = "|")
+                                  ) %>%
+                            # Mettre en forme les données en colonne
+                            separate(col = X3_nettoyee,
+                                     into = c("Jour_Date", "Type_Evenement", "Territoire", "Lieu", "Club"),
+                                     sep = "\\|",
+                                     extra = "drop" # Important si la ligne contient plus de 5 séparateurs
+                                    ) %>%
+                            # Nettoyage final des valeurs des nouvelles colonnes
+                            mutate(# Supprimer les espaces inutiles en début et fin de chaque nouvelle colonne
+                                   across(c(Jour_Date:Club), str_trim),
+                                   # Remplacer les 01, 02, 03 ... par 1, 2, 3...
+                                   Jour_Date = paste0(Jour_Date, " ", str_to_lower(Mois_Concours)) %>%
+                                               str_replace_all(pattern = " 0([1-9])", replacement = " \\1"),
+                                   Adresse = NA,
+                                   Lat = NA,
+                                   Lon = NA
+                                  ) %>%
+                            select(-X3)
+          
+          # Récupération des liens vers les fiches concours
+          concours <- page_mois %>%
+                      html_node("table") %>%
+                      html_nodes("a") %>%
+                      html_attr("href") %>%
+                      as.data.frame() %>%
+                      mutate(Lien_CNEAC = paste0(base_url, .)) %>%
+                      select(-.)
+          
+          # Ajouter les liens à la liste des concours
+          liste_concours <- bind_cols(liste_concours, concours)
+          
+          print(paste0("Début du téléchargement du mois de ", liste_concours[1,1]))
+          
+          Sys.sleep(2)
+          
+          # Parcours des fiches concours
+          for (f in 1:nrow(liste_concours)) {
+            
+            # Lecture de la page
+            page_concours <- read_html(liste_concours[f, "Lien_CNEAC"])
+            
+            # Extraire tout le texte de la page html et nettoyer les espaces
+            fiche <- page_concours %>%
+                     html_node("body") %>%
+                     html_text(trim = TRUE)
+            
+            # Pattern pour l'Adresse: cherche "Adresse : " suivi de n'importe quel contenu jusqu'à "Coordonnées GPS"
+            adresse_pattern <- "Adresse\\s*:\\s*(.*?)(?=\\s*Coordonnées GPS|\\s*GT Informatique et Licences)"
+            
+            # Récupérer l'adresse à l'aide du pattern
+            adresse <- str_match(fiche, adresse_pattern)[, 2] %>% str_trim() %>%
+                                 str_replace_all(pattern = "\\s{2,}", replacement = " ")
+            
+            # Pattern pour les Coordonnées GPS: cherche "Coordonnées GPS : " uivi de n'importe quel contenu jusqu'à "GT Informatique et Licences"
+            coordonnees_pattern <- "Coordonnées GPS\\s*:\\s*(.*?)(?=\\s*GT Informatique et Licences|\\s*partenaires)"
+            
+            # Récupérer les coordonnées à l'aide du pattern
+            coordonnees_brutes <- str_match(fiche, coordonnees_pattern)[, 2] %>% str_trim()
+                                  
+            # Séparer les deux coordonnées par la virgule
+            lat_lon <- str_split(coordonnees_brutes, "\\s*,\\s*", simplify = TRUE)
+
+            # Ajouter les informationsà la liste des concours
+            liste_concours[f, "Adresse"] <- adresse
+            liste_concours[f, "Lat"] <- lat_lon[1, 1]
+            liste_concours[f, "Lon"] <- lat_lon[1, 2]
+            
+            Sys.sleep(2)
+            
+            print(paste0("     Epreuve : ", f," - ", nrow(liste_concours)))
+            
+          }
+          
+          # Fusionner les mois
+          if(exists("df_final")) {
+              df_final <- bind_rows(df_final, liste_concours)
+          } else {
+              df_final <- liste_concours
+           }
+        }
+    }
+  
+  # Créer une colonne mois propre
+  df_final <- df_final %>%
+              mutate(Epreuve = activite,
+                     Mois_Concours = case_when(str_detect(Mois_Concours, "Janvier") ~ paste0("01 - ", Mois_Concours),
+                                               str_detect(Mois_Concours, "Février") ~ paste0("02 - ", Mois_Concours),
+                                               str_detect(Mois_Concours, "Mars") ~ paste0("03 - ", Mois_Concours),
+                                               str_detect(Mois_Concours, "Avril") ~ paste0("04 - ", Mois_Concours),
+                                               str_detect(Mois_Concours, "Mai") ~ paste0("05 - ", Mois_Concours),
+                                               str_detect(Mois_Concours, "Juin") ~ paste0("06 - ", Mois_Concours),
+                                               str_detect(Mois_Concours, "Juillet") ~ paste0("07 - ", Mois_Concours),
+                                               str_detect(Mois_Concours, "Août") ~ paste0("08 - ", Mois_Concours),
+                                               str_detect(Mois_Concours, "Septembre") ~ paste0("09 - ", Mois_Concours),
+                                               str_detect(Mois_Concours, "Octobre") ~ paste0("10 - ", Mois_Concours),
+                                               str_detect(Mois_Concours, "Novembre") ~ paste0("11 - ", Mois_Concours),
+                                               str_detect(Mois_Concours, "Décembre") ~ paste0("12 - ", Mois_Concours)
+                                    )
+                  )
+  
+  return(df_final)
+}
+
+# Fonction : récupération de la liste des clubs
+club <- function(){
+  for (c in 1:nrow(liste_dept)) {
+    
+    # Préparation de l'url
+    url_fiche <- paste0(url_club, liste_dept[c, "DEP"])
+    
+    # Lecture de la page
+    page_dept <- read_html(url_fiche)
+    
+    # Récupération de la liste des clubs
+    lister_club <- page_dept %>%
+                   html_table(fill = TRUE) %>%
+                   as.data.frame() %>%
+                   mutate(Dept_Club = paste0(liste_dept[c, "DEP"], " - ", liste_dept[c, "LIBELLE"]))
+    
+    # Vérification de la présence de clubs
+    if(nrow(lister_club) >= 1) {
+      
+      # Récupération des liens vers les fiches des clubs
+      lien_club <- page_dept %>%
+                   html_nodes("tr") %>%
+                   html_attr("onclick") %>%
+                   as.data.frame() %>%
+                   filter(!(is.na(.))) %>%
+                   mutate(Lien_Club3 = str_extract(., "location\\.href='(.+?)'"),
+                          Lien_Club2 = str_replace(Lien_Club3, "location\\.href='", ""),
+                          Lien_Club = paste0(base_url, str_replace(Lien_Club2, "'", ""))) %>%
+                   select(Lien_Club)
+      
+      # Ajouter les liens à la liste des clubs
+      lister_club <- lister_club %>%
+                     bind_cols(lien_club)
+      
+      print(paste0("Téléchargement du département ", liste_dept[c, "DEP"]))
+      
+      # Fusionner les données départementales
+      if(exists("df_final")) {
+        df_final <- bind_rows(df_final, lister_club)
+      } else {
+        df_final <- lister_club
+      }
+      
+    }
+    
+    Sys.sleep(2)
+  }
+  
+  # Insérer un séparateur uniquement entre une majuscule et un chiffre (code postal)
+  separateur_pattern <- "(?<=[[:upper:]])([[:digit:]])"
+  
+  # Préparer la base de donnée finale
+  df_final <- df_final %>%
+              rename.variable("Nom.du.Club", "Club") %>%
+              mutate(Adresse_club = gsub(separateur_pattern, " \\1", Adresse, perl = TRUE)) %>%
+              select(-Ville, -Adresse)
+  
+  # Supprimer les ""
+  df_final$Club <- str_replace_all(df_final$Club, '"',"")
+  
+  return(df_final)
+}
