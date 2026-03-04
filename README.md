@@ -1,4 +1,4 @@
-# CNEAC - Analyse de Données
+# CNEAC
 
 Ce dépôt contient les outils et scripts nécessaires pour récupérer les données des concours d'agility publiés sur le site de la **CNEAC** (Commission Nationale Éducation et Activités Cynophiles).
 
